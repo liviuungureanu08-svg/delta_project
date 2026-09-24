@@ -7,6 +7,7 @@ from typing import Any
 
 from delta.models.radar import (
     Evidence, MomentumState, RadarCandidate, SaturationState, Signals,
+    count_independent_sources,
 )
 from delta.radar.providers.base import SourceEvidence
 from delta.radar.saturation import SaturationClassifier
@@ -49,13 +50,8 @@ class SignalNormalizer:
         if not evidence_list:
             return signals
 
-        # Independent source count (deduplicated by source_id)
-        seen_source_ids: set[str] = set()
-        independent_count = 0
-        for ev in evidence_list:
-            if ev.is_independent and ev.source_id not in seen_source_ids:
-                independent_count += 1
-                seen_source_ids.add(ev.source_id)
+        # Independent source count (deduplicated by channel/outlet identity)
+        independent_count = count_independent_sources(evidence_list)
 
         signals.independent_source_count = independent_count
         signals.cross_source_confirmed = independent_count >= 2

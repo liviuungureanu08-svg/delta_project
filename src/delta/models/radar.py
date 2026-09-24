@@ -46,6 +46,36 @@ class Evidence:
     notes: Optional[str] = None
 
 
+def independent_source_key(source_type: str, source_id: str, payload: Any) -> str:
+    """Identity of the real-world source behind an evidence item.
+
+    Independence is per publisher, not per item: several videos from one
+    YouTube channel, or several articles from one outlet, are one source.
+      - youtube: payload["channel_id"]
+      - news:    payload["source_name"] (case/whitespace-insensitive)
+      - otherwise (legacy/mock evidence without those fields): source_id
+    """
+    p = payload if isinstance(payload, dict) else {}
+    if source_type == "youtube":
+        channel = str(p.get("channel_id") or "").strip()
+        if channel:
+            return f"youtube:channel:{channel}"
+    elif source_type == "news":
+        outlet = " ".join(str(p.get("source_name") or "").lower().split())
+        if outlet:
+            return f"news:outlet:{outlet}"
+    return f"{source_type}:id:{source_id}"
+
+
+def count_independent_sources(evidence: list[Evidence]) -> int:
+    """Number of distinct independent sources (see independent_source_key)."""
+    return len({
+        independent_source_key(ev.source_type, ev.source_id, ev.observed_value)
+        for ev in evidence
+        if ev.is_independent
+    })
+
+
 @dataclass
 class YouTubeVideoEvidence:
     """Structured evidence for a YouTube video signal."""

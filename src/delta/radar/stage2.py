@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from delta.models.radar import Evidence, LifecycleState, RadarCandidate
+from delta.models.radar import (
+    Evidence, LifecycleState, RadarCandidate, count_independent_sources,
+)
 
 
 def _age_hours(dt: datetime) -> float:
@@ -21,14 +23,8 @@ def _avg_confidence(evidence: list[Evidence]) -> float:
 
 
 def _count_independent(evidence: list[Evidence]) -> int:
-    """Count independent evidence items, deduplicating by source_id."""
-    seen: set[str] = set()
-    count = 0
-    for ev in evidence:
-        if ev.is_independent and ev.source_id not in seen:
-            count += 1
-            seen.add(ev.source_id)
-    return count
+    """Count independent sources, deduplicating by channel/outlet identity."""
+    return count_independent_sources(evidence)
 
 
 def _is_single_large_channel_spike(evidence: list[Evidence], large_threshold: int) -> bool:

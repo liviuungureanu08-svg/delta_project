@@ -101,11 +101,11 @@ def test_rss_diagnostics_entries_and_fresh_per_feed():
 
 # --- Per-candidate ---
 
-def _news_ev(source_id: str, hint: str) -> SourceEvidence:
+def _news_ev(source_id: str, hint: str, outlet: str = "X") -> SourceEvidence:
     return SourceEvidence(
         topic_hint=hint, source_type="news", source_id=source_id,
         observed_at=datetime.now(timezone.utc) - timedelta(hours=3),
-        evidence_type="news_mention", payload={"source_name": "X"},
+        evidence_type="news_mention", payload={"source_name": outlet},
         base_confidence=0.9, is_independent=True,
     )
 
@@ -137,8 +137,8 @@ def test_pipeline_candidate_diagnostics_selected_has_no_rejection():
     inputs = [{
         "topic": "claude coding agent", "niche": "ai_tech",
         "discovery_evidence": [
-            _news_ev("news_1", "claude coding agent"),
-            _news_ev("news_2", "claude coding agent"),
+            _news_ev("news_1", "claude coding agent", outlet="X"),
+            _news_ev("news_2", "claude coding agent", outlet="Y"),
         ],
     }]
 

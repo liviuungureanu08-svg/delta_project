@@ -66,6 +66,9 @@ def _configure_logging(verbose: bool = False) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    # googleapiclient logs full request URLs (including key=<API key>) at
+    # DEBUG/INFO; keep it at WARNING even when Delta runs verbose.
+    logging.getLogger("googleapiclient").setLevel(logging.WARNING)
 
 
 def _build_providers(

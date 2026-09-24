@@ -58,18 +58,29 @@ _DISCOVERY_STOP: frozenset[str] = frozenset({
 _NEWS_STOP: frozenset[str] = _DISCOVERY_STOP | _HEADLINE_NOISE
 
 
-def _normalize_news_topic_hint(title: str) -> str:
-    """Compact a news headline into a topic hint for discovery clustering.
+def normalize_title_topic_hint(
+    title: str, extra_stop: frozenset[str] = frozenset()
+) -> str:
+    """Compact a headline / video title into a topic hint for discovery clustering.
 
     Strips announcement verbs and meta-commentary that inflate the word set
-    and lower Jaccard similarity between headlines covering the same event.
+    and lower Jaccard similarity between titles covering the same event.
     Subject identifiers (product names, company names, domain nouns) are kept.
+    Shared by the RSS and YouTube providers so their hints cluster together;
+    ``extra_stop`` adds source-specific filler words.
     Falls back to a truncated raw title if no significant words survive.
     """
     text = re.sub(r"[^\w\s]", " ", title.lower())
     text = re.sub(r"\s+", " ", text).strip()
-    words = [w for w in text.split() if len(w) > 2 and w not in _NEWS_STOP]
+    words = [
+        w for w in text.split()
+        if len(w) > 2 and w not in _NEWS_STOP and w not in extra_stop
+    ]
     return " ".join(words) if words else title[:80].lower()
+
+
+def _normalize_news_topic_hint(title: str) -> str:
+    return normalize_title_topic_hint(title)
 
 
 _DEFAULT_FEEDS: list[dict] = [

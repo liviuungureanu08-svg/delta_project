@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from delta.models.radar import Evidence, LifecycleState, RadarCandidate, Signals
+from delta.models.radar import (
+    Evidence, LifecycleState, RadarCandidate, Signals, count_independent_sources,
+)
 from delta.radar.signals import SignalNormalizer
 
 
@@ -52,10 +54,7 @@ class Stage1Discovery:
             candidate.lifecycle = LifecycleState.DISCOVERED
             return candidate
 
-        independent_count = sum(
-            1 for ev in fresh_evidence
-            if ev.is_independent
-        )
+        independent_count = count_independent_sources(fresh_evidence)
 
         if independent_count >= self._min_independent:
             candidate.lifecycle = LifecycleState.WATCH

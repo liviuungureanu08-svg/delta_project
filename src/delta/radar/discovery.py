@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+from delta.models.radar import independent_source_key
 from delta.radar.providers.base import SourceEvidence
 
 
@@ -71,13 +72,11 @@ class TopicCluster:
 
     @property
     def independent_source_count(self) -> int:
-        seen: set[str] = set()
-        count = 0
-        for it in self.items:
-            if it.is_independent and it.source_id not in seen:
-                count += 1
-                seen.add(it.source_id)
-        return count
+        return len({
+            independent_source_key(it.source_type, it.source_id, it.payload)
+            for it in self.items
+            if it.is_independent
+        })
 
 
 class TopicDiscovery:

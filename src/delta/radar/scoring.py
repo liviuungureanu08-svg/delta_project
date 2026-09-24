@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from delta.models.radar import (
     Evidence, MomentumState, RadarCandidate, SaturationState,
+    count_independent_sources,
 )
 
 
@@ -108,9 +109,7 @@ class RadarScoring:
         conf = c["base"]
 
         # Independent source contribution
-        independent_count = sum(
-            1 for ev in candidate.evidence if ev.is_independent
-        )
+        independent_count = count_independent_sources(candidate.evidence)
         conf += min(0.50, independent_count * c["per_independent_source"])
 
         # Cross-source confirmation bonus

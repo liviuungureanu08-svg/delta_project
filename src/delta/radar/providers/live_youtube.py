@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from delta.radar.history import Observation, ObservationHistory
 from delta.radar.providers.base import RadarSourceProvider, SourceEvidence
+from delta.radar.providers.live_news import normalize_title_topic_hint
 from delta.radar.quota import ProviderQuota
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,21 @@ def _error_summary(exc: Exception) -> str:
     if reason:
         summary += f": {reason}"
     return _redact(summary)[:200]
+
+
+# Clickbait / format filler common in video titles; not topic identifiers.
+_YOUTUBE_TITLE_NOISE: frozenset[str] = frozenset({
+    "shorts", "video", "videos", "watch", "insane", "crazy", "shocking",
+    "must", "need", "know", "don", "won", "actually", "really", "changes",
+    "explained", "reaction", "full", "official", "live", "stream",
+})
+
+
+def _video_topic_hint(title: str, query: str) -> str:
+    """Topic hint from the video's own title; the search query is only a fallback."""
+    if not title.strip():
+        return query
+    return normalize_title_topic_hint(title, _YOUTUBE_TITLE_NOISE)
 
 
 def _obs_id(video_id: str, date_str: str) -> str:
@@ -348,8 +364,9 @@ class LiveYouTubeProvider(RadarSourceProvider):
             )
             self._history.record(obs)
 
+            title = snippet.get("title", "")
             results.append(SourceEvidence(
-                topic_hint=topic,
+                topic_hint=_video_topic_hint(title, topic),
                 source_type="youtube",
                 source_id=vid_id,
                 observed_at=published_at,
@@ -365,6 +382,7 @@ class LiveYouTubeProvider(RadarSourceProvider):
                     "relative_performance": round(rel_perf, 3),
                     "view_velocity": round(view_velocity, 2),
                     "tags": [],
+                    "query": topic,
                 },
                 base_confidence=0.80,
                 is_independent=True,

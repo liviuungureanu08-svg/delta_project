@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from delta.config import radar_config
-from delta.models.radar import DailyTop5, Evidence, LifecycleState, RadarCandidate
+from delta.models.radar import (
+    DailyTop5, Evidence, LifecycleState, RadarCandidate, independent_source_key,
+)
 from delta.radar.providers.base import RadarSourceProvider, SourceEvidence
 from delta.radar.scoring import RadarScoring
 from delta.radar.signals import evidence_from_source
@@ -104,6 +106,11 @@ class RadarPipeline:
         source_types: dict[str, int] = {}
         for ev in candidate.evidence:
             source_types[ev.source_type] = source_types.get(ev.source_type, 0) + 1
+        source_keys = {
+            independent_source_key(ev.source_type, ev.source_id, ev.observed_value)
+            for ev in candidate.evidence
+            if ev.is_independent
+        }
         selected = candidate.lifecycle == LifecycleState.HUMAN_APPROVAL
         return {
             "topic": candidate.topic,
@@ -111,6 +118,14 @@ class RadarPipeline:
             "evidence_source_types": source_types,
             "evidence_item_count": len(candidate.evidence),
             "independent_source_count": candidate.signals.independent_source_count,
+            # Distinct publishers behind the evidence (channel / outlet identity).
+            "distinct_youtube_channels": sum(
+                1 for k in source_keys if k.startswith("youtube:channel:")
+            ),
+            "distinct_news_outlets": sum(
+                1 for k in source_keys if k.startswith("news:outlet:")
+            ),
+            "fallback_source_id_sources": sum(1 for k in source_keys if ":id:" in k),
             "opportunity_score": candidate.opportunity_score,
             "confidence_score": candidate.confidence_score,
             "momentum": candidate.momentum_state.value,
