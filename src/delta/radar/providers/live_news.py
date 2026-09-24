@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import socket
 from datetime import datetime, timezone
 from typing import Optional
@@ -19,6 +20,56 @@ from delta.radar.providers.base import RadarSourceProvider, SourceEvidence
 from delta.radar.quota import ProviderQuota
 
 logger = logging.getLogger(__name__)
+
+
+# Words common in news headlines that don't identify the underlying topic.
+# Stripping them before clustering raises Jaccard overlap between independently
+# reported articles about the same event.
+_HEADLINE_NOISE: frozenset[str] = frozenset({
+    "announces", "announced",
+    "launches", "launched",
+    "reveals", "revealed",
+    "unveils", "unveiled",
+    "confirms", "confirmed",
+    "introduces", "introduced",
+    "releases", "released",
+    "says", "said",
+    "reports", "reported",
+    "adds", "added",
+    "according", "sources", "insider", "insiders", "exclusive", "breaking",
+    "everything", "heres", "finally", "also", "here", "next",
+    "latest", "major",
+    "could", "would", "should",
+    "today", "week", "month", "year",
+    "update", "updates", "updated",
+    "features", "feature",
+    "improved", "better", "faster",
+})
+
+# Mirrors discovery._STOP_WORDS to avoid cross-package import coupling.
+_DISCOVERY_STOP: frozenset[str] = frozenset({
+    "ai", "the", "a", "an", "in", "of", "for", "and", "or", "to", "with",
+    "how", "why", "what", "is", "are", "was", "be", "by", "at", "on", "new",
+    "best", "top", "my", "i", "you", "your", "this", "that", "it", "from",
+    "2024", "2025", "2026", "2027", "vs", "just", "now", "these",
+    "about", "will", "can", "has", "have", "do", "does",
+})
+
+_NEWS_STOP: frozenset[str] = _DISCOVERY_STOP | _HEADLINE_NOISE
+
+
+def _normalize_news_topic_hint(title: str) -> str:
+    """Compact a news headline into a topic hint for discovery clustering.
+
+    Strips announcement verbs and meta-commentary that inflate the word set
+    and lower Jaccard similarity between headlines covering the same event.
+    Subject identifiers (product names, company names, domain nouns) are kept.
+    Falls back to a truncated raw title if no significant words survive.
+    """
+    text = re.sub(r"[^\w\s]", " ", title.lower())
+    text = re.sub(r"\s+", " ", text).strip()
+    words = [w for w in text.split() if len(w) > 2 and w not in _NEWS_STOP]
+    return " ".join(words) if words else title[:80].lower()
 
 
 _DEFAULT_FEEDS: list[dict] = [
@@ -200,7 +251,8 @@ class LiveNewsProvider(RadarSourceProvider):
 
             cred = entry.get("credibility", "medium")
             conf = _CREDIBILITY_SCORE.get(cred, 0.5)
-            topic = entry.get("title", "unknown topic")
+            raw_title = entry.get("title", "") or ""
+            topic = _normalize_news_topic_hint(raw_title) if raw_title else "unknown topic"
 
             results.append(SourceEvidence(
                 topic_hint=topic,

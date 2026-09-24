@@ -422,3 +422,104 @@ def test_live_news_discovery_evidence_returns_all_entries():
         result = p.fetch_discovery_evidence()
     # 3 entries × 2 feeds = up to 6, but duplicates by source_id are deduped
     assert len(result) >= 1
+
+
+# --- News topic hint normalization ---
+
+def test_normalize_news_topic_hint_strips_noise():
+    from delta.radar.providers.live_news import _normalize_news_topic_hint
+
+    hint = _normalize_news_topic_hint(
+        "OpenAI announces GPT-5 with improved reasoning capabilities"
+    )
+    words = hint.split()
+    assert "openai" in words
+    assert "gpt" in words
+    assert "announces" not in words
+    assert "improved" not in words
+
+
+def test_normalize_same_event_headlines_cluster():
+    """Two differently-worded headlines about the same product should merge."""
+    from delta.radar.providers.live_news import _normalize_news_topic_hint
+    from delta.radar.discovery import TopicDiscovery
+    from delta.radar.providers.base import SourceEvidence
+
+    now = datetime.now(timezone.utc)
+    hint_a = _normalize_news_topic_hint(
+        "Anthropic launches Claude 3.7 with extended thinking"
+    )
+    hint_b = _normalize_news_topic_hint(
+        "Claude 3.7 from Anthropic confirmed: reasoning improved"
+    )
+
+    evidence = [
+        SourceEvidence(
+            topic_hint=hint_a, source_type="news", source_id="art_a",
+            observed_at=now, evidence_type="news_mention", payload={},
+        ),
+        SourceEvidence(
+            topic_hint=hint_b, source_type="news", source_id="art_b",
+            observed_at=now, evidence_type="news_mention", payload={},
+        ),
+    ]
+    clusters = TopicDiscovery().discover(evidence)
+    assert len(clusters) == 1, (
+        f"Expected 1 cluster but got {len(clusters)}: "
+        f"hint_a={hint_a!r}, hint_b={hint_b!r}"
+    )
+    assert clusters[0].independent_source_count == 2
+
+
+def test_normalize_unrelated_headlines_stay_separate():
+    """Headlines about unrelated topics must not merge into one cluster."""
+    from delta.radar.providers.live_news import _normalize_news_topic_hint
+    from delta.radar.discovery import TopicDiscovery
+    from delta.radar.providers.base import SourceEvidence
+
+    now = datetime.now(timezone.utc)
+    hint_ai = _normalize_news_topic_hint(
+        "Anthropic Claude 3.7 extended thinking model released"
+    )
+    hint_chip = _normalize_news_topic_hint(
+        "TSMC 2nm chip production ramp confirmed for 2027"
+    )
+
+    evidence = [
+        SourceEvidence(
+            topic_hint=hint_ai, source_type="news", source_id="art_ai",
+            observed_at=now, evidence_type="news_mention", payload={},
+        ),
+        SourceEvidence(
+            topic_hint=hint_chip, source_type="news", source_id="art_chip",
+            observed_at=now, evidence_type="news_mention", payload={},
+        ),
+    ]
+    clusters = TopicDiscovery().discover(evidence)
+    assert len(clusters) == 2, (
+        f"Expected 2 clusters but got {len(clusters)}: "
+        f"hint_ai={hint_ai!r}, hint_chip={hint_chip!r}"
+    )
+
+
+def test_discovery_evidence_topic_hint_is_normalized():
+    """fetch_discovery_evidence must not include announcement verbs in topic_hint."""
+    p = _make_news_provider()
+    entry = _make_entry({
+        "title": "Google announces Gemini Ultra 2 with improved performance",
+        "link": "http://example.com/gemini",
+        "dt": _recent_dt(),
+    })
+    feed = MagicMock()
+    feed.get = lambda k, d=None: {"entries": [entry], "bozo": False}.get(k, d)
+    feed.bozo = False
+    feed.entries = [entry]
+
+    with patch("feedparser.parse", return_value=feed):
+        result = p.fetch_discovery_evidence()
+
+    assert result, "Expected at least one discovery evidence item"
+    hint_words = result[0].topic_hint.split()
+    assert "announces" not in hint_words
+    assert "improved" not in hint_words
+    assert ("google" in hint_words or "gemini" in hint_words)
