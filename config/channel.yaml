@@ -1,0 +1,57 @@
+channel:
+  name: "Kronos AI"
+  niche: "AI / Technology"
+  target_audience: "Tech enthusiasts aged 18-45 interested in AI tools, developments, and implications"
+  language: "en"
+  platforms:
+    - youtube
+    - instagram
+  editorial_rules:
+    - "Lead with why the viewer should care"
+    - "Use real examples and demonstrations over theory"
+    - "Avoid hype; focus on practical implications"
+    - "Cite evidence; never fabricate statistics"
+    - "Accessible to informed non-experts"
+
+formats:
+  SHORT:
+    label: "YouTube Short"
+    target_duration_seconds: [15, 60]
+    publishing_target_per_week: 3
+    monetization_priority: "high"
+    production_budget_key: "short"
+
+  UTILITY_LONG_FORM:
+    label: "Utility Long-Form"
+    target_duration_seconds: [480, 1200]
+    publishing_target_per_week: 1
+    monetization_priority: "high"
+    production_budget_key: "long_form"
+
+  DOCUMENTARY:
+    label: "Documentary"
+    target_duration_seconds: [1500, 2700]
+    publishing_target_per_week: 0.25
+    monetization_priority: "medium"
+    production_budget_key: "documentary"
+
+  INSTAGRAM_POST:
+    label: "Instagram Post"
+    target_duration_seconds: null
+    publishing_target_per_week: 5
+    monetization_priority: "low"
+    production_budget_key: "instagram_post"
+
+  INSTAGRAM_CAROUSEL:
+    label: "Instagram Carousel"
+    target_duration_seconds: null
+    publishing_target_per_week: 3
+    monetization_priority: "medium"
+    production_budget_key: "instagram_carousel"
+
+approval:
+  topic_approval: human
+  script_approval: human
+  production_approval: human
+  publish_approval: human
+  # Set to "auto" to bypass human gate for a specific step

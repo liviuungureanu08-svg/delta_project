@@ -1,0 +1,31 @@
+retention:
+  pacing:
+    hook_window_seconds: 15
+    hook_change_interval_seconds: 3
+    body_change_interval_seconds: 8
+    outro_change_interval_seconds: 5
+
+  asset_preference_order:
+    - SCREEN_RECORDING
+    - SCREENSHOT
+    - CHART
+    - GRAPHIC
+    - GENERATED_IMAGE
+    - TEXT_OVERLAY
+    - ZOOM_PAN
+    - B_ROLL
+    - AI_GENERATED_VIDEO
+
+  premium_asset_types:
+    - AI_GENERATED_VIDEO
+
+  free_asset_types:
+    - SCREENSHOT
+    - SCREEN_RECORDING
+    - STATIC_IMAGE
+    - TEXT_OVERLAY
+    - GRAPHIC
+    - CHART
+    - B_ROLL
+    - ZOOM_PAN
+    - TRANSITION

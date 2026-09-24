@@ -1,0 +1,31 @@
+budgets:
+  per_format:
+    short:
+      max_usd: 2.00
+      ai_video_seconds_limit: 10
+      ai_image_count_limit: 5
+      attempts_limit: 3
+    long_form:
+      max_usd: 15.00
+      ai_video_seconds_limit: 60
+      ai_image_count_limit: 20
+      attempts_limit: 5
+    documentary:
+      max_usd: 50.00
+      ai_video_seconds_limit: 180
+      ai_image_count_limit: 40
+      attempts_limit: 8
+    instagram_post:
+      max_usd: 1.00
+      ai_video_seconds_limit: 0
+      ai_image_count_limit: 1
+      attempts_limit: 2
+    instagram_carousel:
+      max_usd: 3.00
+      ai_video_seconds_limit: 0
+      ai_image_count_limit: 8
+      attempts_limit: 3
+
+  rolling:
+    daily_max_usd: 20.00
+    monthly_max_usd: 400.00

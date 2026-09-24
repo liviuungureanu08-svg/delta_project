@@ -1,0 +1,15 @@
+scoring:
+  weights:
+    audience_relevance: 0.25
+    demand_signal: 0.20
+    freshness: 0.20
+    competition_gap: 0.15
+    monetization_potential: 0.10
+    title_thumbnail_potential: 0.10
+
+  thresholds:
+    minimum_score_to_proceed: 0.55
+    high_confidence_minimum: 0.75
+
+  confidence_floor: 0.10
+  confidence_ceil: 1.00
