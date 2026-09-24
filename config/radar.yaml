@@ -94,8 +94,32 @@ radar:
     # Must remain HUMAN_APPROVAL = None (pending) until human decides
     auto_approve: false
 
-  # Reference channel configuration (future use)
+  # Reference channel configuration (signals, not templates)
   reference_channels:
-    # Future: list of reference channel IDs for competitor monitoring
-    # Phase 2 does not require populated channels
     channels: []
+
+  # Phase 3 — Live source configuration
+  live:
+    # Set to true to use live YouTube + RSS providers.
+    # Requires YOUTUBE_API_KEY env var for YouTube.
+    # If false (default), mock providers are used (offline, deterministic).
+    enabled: false
+
+    youtube:
+      # Max search requests per daily run (each request = ~100 YT quota units).
+      # YouTube Data API v3 free tier: 10,000 units/day.
+      # 50 search requests = 5,000 units; safe margin for video/channel stat batches.
+      daily_search_budget: 50
+      # Hours back to look for newly published videos in discovery
+      discovery_published_after_hours: 48
+
+    news:
+      # max_age_hours: articles older than this are ignored
+      max_age_hours: 72
+      # feeds: list of {url, name, credibility: high|medium|low}
+      # If empty, falls back to built-in default feed list.
+      feeds: []
+
+    search_interest:
+      # disabled — no official Google Trends API available in Phase 3
+      enabled: false

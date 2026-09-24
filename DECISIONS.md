@@ -36,5 +36,22 @@ Topics tagged `cross_niche` require 3 independent sources (vs 2 for `ai_tech`), 
 ## D12 — All radar providers are offline and fixture-based for Phase 2
 MockYouTubeProvider, MockTrendsProvider, and MockNewsProvider use hard-coded fixture dicts — no network calls, no API keys, no credentials. The RadarSourceProvider interface is designed so real API clients can replace them transparently in Phase 3. Rationale: Phase 2 validates pipeline architecture and scoring without incurring API costs or requiring credentials from contributors.
 
+## D14 — Live providers degrade gracefully, never produce negative evidence
+Provider failure (API quota exhausted, network error, missing credentials) results in empty
+evidence, not negative evidence against a topic. A WATCH candidate that cannot be re-queried
+due to quota stays at WATCH rather than being demoted. Rationale: evidence absence is not
+evidence of absence; penalizing topics because a provider is down would produce false negatives.
+
+## D15 — No LLM dependency for topic clustering in Phase 3
+TopicDiscovery uses lightweight Jaccard word-overlap similarity (threshold-configurable) instead
+of an LLM for topic clustering. Rationale: avoids external API dependency and cost for a
+well-bounded task where keyword similarity is sufficient. Optional AI-assisted semantic
+clustering can be layered on top via subclassing without touching the pipeline.
+
+## D16 — Search interest provider is disabled, not removed
+SearchInterestProvider exists as a disabled no-op rather than being absent. Rationale:
+the interface is preserved so the pipeline can be tested against it and future integration
+requires only implementing the class body, not restructuring the pipeline or config.
+
 ## D13 — Saturation is estimated, not measured
 SaturationClassifier estimates upload velocity from channel upload_frequency_days × the count of channels that have produced content on the topic, then escalates one step if large-channel coverage is high. It does not query YouTube's actual video count. Rationale: a precise video count requires an API call; an estimate from fixture metadata is sufficient to distinguish EARLY from SATURATED for editorial decisions, and it scales to real providers when they supply the same fields.

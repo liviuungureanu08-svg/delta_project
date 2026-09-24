@@ -8,3 +8,6 @@ venv/
 .pytest_cache/
 .env
 *.env
+# Local observation history and reports (runtime data, not source)
+data/observations/
+data/reports/
