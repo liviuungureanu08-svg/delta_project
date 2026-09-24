@@ -64,6 +64,33 @@ class Top5Selector:
             candidates_rejected=rejected_count,
         )
 
+    def rejection_reason(self, candidate: RadarCandidate) -> str:
+        """Explain why a non-selected candidate did not enter the Top 5.
+
+        Read-only mirror of the eligibility filter in select(); used for diagnostics.
+        """
+        reasons: list[str] = []
+        if _LIFECYCLE_RANK.get(candidate.lifecycle, 0) < self._min_lifecycle_rank:
+            stage = (
+                "Stage 1: no fresh independent evidence"
+                if candidate.lifecycle == LifecycleState.DISCOVERED
+                else f"Stage 2: {candidate.main_risk or 'not validated'}"
+            )
+            reasons.append(
+                f"Lifecycle {candidate.lifecycle.value} < {self._min_lifecycle_str} ({stage})"
+            )
+        if candidate.opportunity_score < self._min_opportunity:
+            reasons.append(
+                f"Opportunity score {candidate.opportunity_score:.3f} < {self._min_opportunity}"
+            )
+        if candidate.confidence_score < self._min_confidence:
+            reasons.append(
+                f"Confidence score {candidate.confidence_score:.3f} < {self._min_confidence}"
+            )
+        if not reasons:
+            reasons.append(f"Eligible but ranked below top {self.MAX_CANDIDATES}")
+        return "; ".join(reasons)
+
     def _to_report(self, candidate: RadarCandidate) -> OpportunityReport:
         formats = self._recommend_formats(candidate)
         return OpportunityReport(

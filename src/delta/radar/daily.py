@@ -157,6 +157,51 @@ def _collect_discovery_evidence(
     return all_evidence
 
 
+def _build_diagnostics(
+    cfg: dict,
+    providers: list[RadarSourceProvider],
+    discovery_evidence: list,
+    discovery_mode: str,
+    cluster_count: int,
+    candidate_diagnostics: list[dict],
+) -> dict:
+    """Assemble key-free runtime diagnostics for the JSON report."""
+    from delta.radar.providers.live_news import LiveNewsProvider
+    from delta.radar.providers.live_youtube import LiveYouTubeProvider
+
+    youtube: dict = {"provider": "none", "provider_initialized": False}
+    news: dict = {"provider": "none"}
+    for provider in providers:
+        if isinstance(provider, LiveYouTubeProvider):
+            youtube = provider.diagnostics()
+        elif isinstance(provider, MockYouTubeProvider):
+            youtube = {
+                "provider": "mock",
+                "provider_initialized": False,
+                "youtube_api_key_set": bool(os.environ.get("YOUTUBE_API_KEY")),
+            }
+        elif isinstance(provider, LiveNewsProvider):
+            news = provider.diagnostics()
+        elif isinstance(provider, MockNewsProvider):
+            news = {"provider": "mock"}
+
+    by_type: dict[str, int] = {}
+    for ev in discovery_evidence:
+        by_type[ev.source_type] = by_type.get(ev.source_type, 0) + 1
+    youtube["total_fresh_evidence"] = by_type.get("youtube", 0)
+    news["total_fresh_evidence"] = by_type.get("news", 0)
+
+    return {
+        "live_enabled": bool(cfg.get("live", {}).get("enabled", False)),
+        "discovery_mode": discovery_mode,
+        "discovery_evidence_by_source_type": by_type,
+        "discovery_cluster_count": cluster_count,
+        "youtube": youtube,
+        "rss": news,
+        "candidates": candidate_diagnostics,
+    }
+
+
 def _format_report(top5: DailyTop5, run_date: str) -> str:
     lines = [
         f"=== DELTA DAILY RADAR — {run_date} ===",
@@ -215,11 +260,15 @@ def run_daily(
     # --- Autonomous discovery from live sources ---
     discovery_evidence = _collect_discovery_evidence(providers, queries)
 
+    cluster_count = 0
     if discovery_evidence:
+        discovery_mode = "live"
         clusters = discovery.discover(discovery_evidence)
+        cluster_count = len(clusters)
         topic_inputs = discovery.to_topic_inputs(clusters, min_evidence=1)
         logger.info("Discovered %d topic cluster(s) from live evidence.", len(clusters))
     else:
+        discovery_mode = "fallback_topics"
         topic_inputs = offline_fallback_topics or _FALLBACK_TOPICS
         logger.info(
             "No live discovery evidence — using fallback topics (%d).", len(topic_inputs)
@@ -238,6 +287,14 @@ def run_daily(
         "candidates_evaluated": top5.candidates_evaluated,
         "candidates_rejected": top5.candidates_rejected,
         "opportunities": [r.to_dict() for r in top5.reports],
+        "diagnostics": _build_diagnostics(
+            cfg,
+            providers,
+            discovery_evidence,
+            discovery_mode,
+            cluster_count,
+            pipeline.last_candidate_diagnostics,
+        ),
     }
     with open(report_path, "w") as f:
         json.dump(machine_data, f, indent=2, default=str)

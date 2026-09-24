@@ -174,6 +174,28 @@ class LiveNewsProvider(RadarSourceProvider):
         self._timeout = timeout_seconds
         self._feed_cache: dict[str, list[dict]] = {}
 
+    def _feed_stats(self) -> dict[str, dict]:
+        # Lazily created so instances built via __new__ (tests) also work.
+        stats = getattr(self, "_feed_diag", None)
+        if stats is None:
+            stats = {}
+            self._feed_diag = stats
+        return stats
+
+    def diagnostics(self) -> dict:
+        """Per-feed runtime diagnostics for the daily report."""
+        feeds = {name: dict(v) for name, v in self._feed_stats().items()}
+        return {
+            "provider": "live",
+            "feeds_configured": len(self._feeds),
+            "feeds": feeds,
+            "total_entries": sum(v.get("entries", 0) for v in feeds.values()),
+            "total_fresh_discovery_evidence": sum(
+                v.get("fresh_items", 0) for v in feeds.values()
+            ),
+            "max_age_hours": self._max_age_hours,
+        }
+
     @property
     def source_type(self) -> str:
         return "news"
@@ -271,6 +293,13 @@ class LiveNewsProvider(RadarSourceProvider):
                 is_independent=True,
             ))
 
+        fresh_by_feed: dict[str, int] = {}
+        for ev in results:
+            name = ev.payload.get("source_name", "")
+            fresh_by_feed[name] = fresh_by_feed.get(name, 0) + 1
+        for name, stat in self._feed_stats().items():
+            stat["fresh_items"] = fresh_by_feed.get(name, 0)
+
         return results
 
     def _load_all_feeds(self) -> list[dict]:
@@ -292,7 +321,13 @@ class LiveNewsProvider(RadarSourceProvider):
         name = feed_config.get("name", url)
         cred = feed_config.get("credibility", "medium")
 
+        stat: dict = {
+            "status": "ok", "entries": 0, "fresh_items": 0, "http_status": None, "error": None,
+        }
+        self._feed_stats()[name] = stat
+
         if not self._quota.consume(1):
+            stat["status"] = "skipped_quota"
             return []
 
         old_timeout = socket.getdefaulttimeout()
@@ -305,6 +340,8 @@ class LiveNewsProvider(RadarSourceProvider):
         except Exception as exc:
             logger.warning("Feed fetch failed for %s: %s", name, exc)
             self._quota.record_failure()
+            stat["status"] = "fetch_failed"
+            stat["error"] = f"{type(exc).__name__}: {exc}"[:200]
             return []
         finally:
             socket.setdefaulttimeout(old_timeout)
@@ -314,6 +351,8 @@ class LiveNewsProvider(RadarSourceProvider):
                 "Feed parse error for %s: %s", name, feed.get("bozo_exception")
             )
             self._quota.record_failure()
+            stat["status"] = "parse_failed"
+            stat["error"] = str(feed.get("bozo_exception"))[:200]
             return []
 
         entries = []
@@ -333,4 +372,6 @@ class LiveNewsProvider(RadarSourceProvider):
                 "published_at": pub_dt,
             })
 
+        stat["entries"] = len(entries)
+        stat["http_status"] = feed.get("status")
         return entries

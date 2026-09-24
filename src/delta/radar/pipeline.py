@@ -28,6 +28,8 @@ class RadarPipeline:
         self._scoring = RadarScoring(self._cfg)
         self._stage2 = Stage2Validation(self._cfg)
         self._top5 = Top5Selector(self._cfg)
+        # Per-candidate diagnostics from the most recent run() (read-only record).
+        self.last_candidate_diagnostics: list[dict] = []
 
     def run(
         self,
@@ -48,6 +50,7 @@ class RadarPipeline:
             DailyTop5 with at most 5 human-approval-pending opportunity reports.
         """
         candidates: list[RadarCandidate] = []
+        stage_lifecycles: list[tuple[str, str]] = []
 
         for topic_input in topic_inputs:
             topic = topic_input["topic"]
@@ -73,16 +76,51 @@ class RadarPipeline:
 
             # Stage 1: sensitive discovery
             candidate = self._stage1.process(candidate)
+            lifecycle_stage1 = candidate.lifecycle.value
 
             # Preliminary scoring (needed by Stage 2)
             candidate = self._scoring.score(candidate)
 
             # Stage 2: validation
             candidate = self._stage2.process(candidate)
+            lifecycle_stage2 = candidate.lifecycle.value
 
             # Re-score after validation (signals may have been refined)
             candidate = self._scoring.score(candidate)
 
             candidates.append(candidate)
+            stage_lifecycles.append((lifecycle_stage1, lifecycle_stage2))
 
-        return self._top5.select(candidates)
+        top5 = self._top5.select(candidates)
+        self.last_candidate_diagnostics = [
+            self._candidate_diagnostics(c, s1, s2)
+            for c, (s1, s2) in zip(candidates, stage_lifecycles)
+        ]
+        return top5
+
+    def _candidate_diagnostics(
+        self, candidate: RadarCandidate, lifecycle_stage1: str, lifecycle_stage2: str
+    ) -> dict:
+        source_types: dict[str, int] = {}
+        for ev in candidate.evidence:
+            source_types[ev.source_type] = source_types.get(ev.source_type, 0) + 1
+        selected = candidate.lifecycle == LifecycleState.HUMAN_APPROVAL
+        return {
+            "topic": candidate.topic,
+            "niche": candidate.niche,
+            "evidence_source_types": source_types,
+            "evidence_item_count": len(candidate.evidence),
+            "independent_source_count": candidate.signals.independent_source_count,
+            "opportunity_score": candidate.opportunity_score,
+            "confidence_score": candidate.confidence_score,
+            "momentum": candidate.momentum_state.value,
+            "saturation": candidate.saturation_state.value,
+            "freshness_days": candidate.signals.freshness_days,
+            "lifecycle_after_stage1": lifecycle_stage1,
+            "lifecycle_after_stage2": lifecycle_stage2,
+            "selected_for_top5": selected,
+            "main_risk": candidate.main_risk,
+            "rejection_reason": (
+                None if selected else self._top5.rejection_reason(candidate)
+            ),
+        }

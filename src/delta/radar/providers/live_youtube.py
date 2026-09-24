@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -17,6 +18,26 @@ from delta.radar.providers.base import RadarSourceProvider, SourceEvidence
 from delta.radar.quota import ProviderQuota
 
 logger = logging.getLogger(__name__)
+
+_KEY_PARAM_RE = re.compile(r"(key=)[^&\s\"'>]+", re.IGNORECASE)
+
+
+def _redact(value: object) -> str:
+    """Stringify and strip any API key query parameter (HttpError text embeds the URL)."""
+    return _KEY_PARAM_RE.sub(r"\1REDACTED", str(value))
+
+
+def _error_summary(exc: Exception) -> str:
+    """Short, key-free description of an API error for diagnostics."""
+    status = getattr(getattr(exc, "resp", None), "status", None)
+    reason = getattr(exc, "reason", None) or ""
+    parts = [type(exc).__name__]
+    if status is not None:
+        parts.append(str(status))
+    summary = " ".join(parts)
+    if reason:
+        summary += f": {reason}"
+    return _redact(summary)[:200]
 
 
 def _obs_id(video_id: str, date_str: str) -> str:
@@ -77,9 +98,33 @@ class LiveYouTubeProvider(RadarSourceProvider):
             self._available = True
             self._quota.available = True
         except Exception as exc:
-            logger.warning("YouTube API client init failed: %s", exc)
+            logger.warning("YouTube API client init failed: %s", _redact(exc))
+            self._diag()["init_error"] = _error_summary(exc)
             self._available = False
             self._quota.available = False
+
+    def _diag(self) -> dict:
+        # Lazily created so instances built via __new__ (tests) also work.
+        diag = getattr(self, "_diagnostics", None)
+        if diag is None:
+            diag = {"init_error": None, "discovery_queries": [], "stats_failures": 0}
+            self._diagnostics = diag
+        return diag
+
+    def diagnostics(self) -> dict:
+        """Key-free runtime diagnostics for the daily report."""
+        diag = self._diag()
+        queries = diag["discovery_queries"]
+        return {
+            "provider": "live",
+            "provider_initialized": bool(self._available and self._client is not None),
+            "init_error": diag["init_error"],
+            "search_failures": self._quota.failed_requests,
+            "stats_failures": diag["stats_failures"],
+            "quota": self._quota.to_dict(),
+            "discovery_queries": list(queries),
+            "total_discovery_evidence": sum(q["evidence_items"] for q in queries),
+        }
 
     @property
     def source_type(self) -> str:
@@ -112,7 +157,7 @@ class LiveYouTubeProvider(RadarSourceProvider):
                 self._evidence_cache[cache_key] = evidence
                 results.extend(evidence)
             except Exception as exc:
-                logger.warning("YouTube evidence fetch failed for %r: %s", topic, exc)
+                logger.warning("YouTube evidence fetch failed for %r: %s", topic, _redact(exc))
                 self._quota.record_failure()
 
         return results
@@ -134,6 +179,8 @@ class LiveYouTubeProvider(RadarSourceProvider):
         after_dt = datetime.now(timezone.utc) - timedelta(hours=published_after_hours)
         after_str = after_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+        query_diag = self._diag()["discovery_queries"]
+
         for query in queries:
             if self._quota.is_exhausted:
                 logger.info("YouTube quota exhausted; skipping remaining discovery queries.")
@@ -143,24 +190,50 @@ class LiveYouTubeProvider(RadarSourceProvider):
             if cache_key in self._evidence_cache:
                 self._quota.record_cache_hit()
                 results.extend(self._evidence_cache[cache_key])
+                query_diag.append({
+                    "query": query, "status": "cache_hit", "search_items": None,
+                    "evidence_items": len(self._evidence_cache[cache_key]), "error": None,
+                })
                 continue
 
             if not self._quota.consume(1):
                 logger.info("YouTube quota limit reached at query %r", query)
                 break
 
+            entry: dict[str, Any] = {
+                "query": query, "status": "ok", "search_items": 0,
+                "evidence_items": 0, "error": None,
+            }
+            query_diag.append(entry)
+            self._diag()["last_search_error"] = None
             try:
                 items = self._search_videos(
                     query,
                     published_after=after_str,
                     max_results=10,
                 )
+                entry["search_items"] = len(items)
+                search_error = self._diag().get("last_search_error")
+                if search_error:
+                    entry["status"] = "search_failed"
+                    entry["error"] = search_error
                 evidence = self._process_search_results(query, items)
+                entry["evidence_items"] = len(evidence)
                 self._evidence_cache[cache_key] = evidence
                 results.extend(evidence)
             except Exception as exc:
-                logger.warning("Discovery search failed for %r: %s", query, exc)
+                logger.warning("Discovery search failed for %r: %s", query, _redact(exc))
                 self._quota.record_failure()
+                entry["status"] = "failed"
+                entry["error"] = _error_summary(exc)
+
+        recorded = {q["query"] for q in query_diag}
+        for query in queries:
+            if query not in recorded:
+                query_diag.append({
+                    "query": query, "status": "not_run_quota", "search_items": None,
+                    "evidence_items": 0, "error": None,
+                })
 
         return results
 
@@ -188,8 +261,9 @@ class LiveYouTubeProvider(RadarSourceProvider):
             response = self._client.search().list(**kwargs).execute()
             return response.get("items", [])
         except Exception as exc:
-            logger.warning("YouTube search API call failed: %s", exc)
+            logger.warning("YouTube search API call failed: %s", _redact(exc))
             self._quota.record_failure()
+            self._diag()["last_search_error"] = _error_summary(exc)
             return []
 
     def _process_search_results(
@@ -305,7 +379,8 @@ class LiveYouTubeProvider(RadarSourceProvider):
                         "channel_id": snippet.get("channelId", ""),
                     }
             except Exception as exc:
-                logger.warning("Video stats batch failed: %s", exc)
+                logger.warning("Video stats batch failed: %s", _redact(exc))
+                self._diag()["stats_failures"] += 1
 
         return result
 
@@ -344,6 +419,7 @@ class LiveYouTubeProvider(RadarSourceProvider):
                         # Rough estimate: ~2% of subscribers watch a typical video
                         baselines[ch_id] = max(1, int(sub_count * 0.02))
                 except Exception as exc:
-                    logger.warning("Channel stats batch failed: %s", exc)
+                    logger.warning("Channel stats batch failed: %s", _redact(exc))
+                    self._diag()["stats_failures"] += 1
 
         return baselines
