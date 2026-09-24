@@ -1,11 +1,11 @@
 """Tests for ContentPlanner."""
 
 import pytest
-from kronos.config import reload_all
-from kronos.engine import ContentPlanner
-from kronos.models.content_plan import ApprovalStatus
-from kronos.models.research import MasterResearch
-from kronos.models.topic import TopicCandidate
+from delta.config import reload_all
+from delta.engine import ContentPlanner
+from delta.models.content_plan import ApprovalStatus
+from delta.models.research import MasterResearch
+from delta.models.topic import TopicCandidate
 
 
 @pytest.fixture(autouse=True)

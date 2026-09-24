@@ -1,10 +1,10 @@
 """Tests for RetentionBuilder and RetentionPlan."""
 
 import pytest
-from kronos.config import reload_all
-from kronos.engine import RetentionBuilder
-from kronos.models.content_plan import ContentPlan, ContentSection
-from kronos.models.retention import AssetType, RetentionPlan, TimelineSegment
+from delta.config import reload_all
+from delta.engine import RetentionBuilder
+from delta.models.content_plan import ContentPlan, ContentSection
+from delta.models.retention import AssetType, RetentionPlan, TimelineSegment
 
 
 @pytest.fixture(autouse=True)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from kronos.models.research import MasterResearch, ResearchSource
-from kronos.models.topic import CompetitionIndicators, DemandIndicators, TopicCandidate
+from delta.models.research import MasterResearch, ResearchSource
+from delta.models.topic import CompetitionIndicators, DemandIndicators, TopicCandidate
 
 
 def make_topic_candidate() -> TopicCandidate:
@@ -71,7 +71,7 @@ def make_master_research(topic: str) -> MasterResearch:
         sources=[
             ResearchSource(
                 title="Anthropic Computer Use Documentation",
-                url=None,   # real URL not stored; would be fetched by future research agent
+                url=None,
                 type="article",
                 notes="Official documentation — primary source",
             ),

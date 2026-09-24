@@ -1,8 +1,8 @@
 """Tests for provider abstraction."""
 
 import pytest
-from kronos.providers import MockImageProvider, MockTTSProvider, MockVideoProvider
-from kronos.providers.base import GenerationRequest
+from delta.providers import MockImageProvider, MockTTSProvider, MockVideoProvider
+from delta.providers.base import GenerationRequest
 
 
 def test_mock_video_provider_available():

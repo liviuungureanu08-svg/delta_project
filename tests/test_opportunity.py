@@ -1,9 +1,9 @@
 """Tests for the Opportunity Engine."""
 
 import pytest
-from kronos.config import reload_all
-from kronos.engine import OpportunityEngine
-from kronos.models.topic import CompetitionIndicators, DemandIndicators, TopicCandidate
+from delta.config import reload_all
+from delta.engine import OpportunityEngine
+from delta.models.topic import CompetitionIndicators, DemandIndicators, TopicCandidate
 
 
 @pytest.fixture(autouse=True)

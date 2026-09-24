@@ -1,8 +1,8 @@
 """Tests for approval gates."""
 
 import pytest
-from kronos.config import reload_all
-from kronos.workflow import ApprovalGate, ApprovalGateError, WorkflowState
+from delta.config import reload_all
+from delta.workflow import ApprovalGate, ApprovalGateError, WorkflowState
 
 
 @pytest.fixture(autouse=True)

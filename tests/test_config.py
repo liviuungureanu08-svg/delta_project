@@ -1,7 +1,7 @@
 """Tests for configuration loading."""
 
 import pytest
-from kronos.config import (
+from delta.config import (
     budgets_config,
     channel_config,
     providers_config,

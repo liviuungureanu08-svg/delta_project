@@ -1,0 +1,101 @@
+radar:
+  # Primary niche — AI / Technology
+  primary_niche: ai_tech
+
+  # Stage 1: Sensitive discovery (favor recall)
+  stage1:
+    # Minimum evidence items to enter WATCH (not REJECTED at discovery)
+    min_evidence_to_watch: 1
+    # Minimum independent source count to pass Stage 1
+    min_independent_sources: 1
+    # Max age in hours for evidence to be considered fresh
+    max_evidence_age_hours: 168   # 7 days
+    # YouTube breakout: relative performance multiplier to flag as potential breakout
+    youtube_breakout_multiplier: 2.5
+    # Minimum view velocity (views/hr) to count as a signal
+    min_view_velocity: 50
+
+  # Stage 2: Validation (skeptical, false-positive reduction)
+  stage2:
+    # AI/Tech niche thresholds
+    ai_tech:
+      # Minimum independent sources to move WATCH → VALIDATED
+      min_independent_sources_for_validation: 2
+      # Maximum evidence age to count as valid signal
+      max_evidence_age_hours: 72
+      # Minimum average evidence confidence for validation
+      min_avg_evidence_confidence: 0.55
+      # Minimum opportunity score to allow validation
+      min_opportunity_score: 0.45
+
+    # Cross-niche — stricter than primary
+    cross_niche:
+      min_independent_sources_for_validation: 3
+      max_evidence_age_hours: 48
+      min_avg_evidence_confidence: 0.70
+      min_opportunity_score: 0.60
+
+  # Scoring weights for RadarCandidate opportunity score
+  scoring:
+    weights:
+      momentum: 0.25
+      freshness: 0.20
+      cross_source_confirmation: 0.20
+      saturation_gap: 0.15      # low saturation is favorable
+      audience_relevance: 0.10
+      monetization: 0.05
+      packaging_potential: 0.05  # title + thumbnail potential combined
+
+    # Confidence scoring components
+    confidence:
+      base: 0.10
+      per_independent_source: 0.15
+      cross_source_bonus: 0.10
+      youtube_breakout_bonus: 0.10
+      freshness_bonus_multiplier: 0.05   # per day under threshold
+      freshness_threshold_days: 3
+      max: 1.00
+
+  # Saturation thresholds (configurable)
+  saturation:
+    # YouTube video count tiers (existing competition density, approximate)
+    # These are conceptual; actual thresholds should be tuned to real data
+    upload_velocity_per_day:
+      early: 2
+      emerging: 10
+      accelerating: 30
+      mainstream: 80
+      # above mainstream = SATURATED
+    # Channel relative performance as saturation indicator
+    # If many large channels are covering it normally, topic is maturing
+    large_channel_coverage_threshold: 5  # channels with >100k baseline
+
+  # False-positive protection rules
+  false_positive:
+    # Single large channel spike is not independent confirmation
+    # A channel with baseline > this is considered "large" (its normal performance ≠ breakout)
+    large_channel_baseline_threshold: 100000
+    # A relative multiplier below this from a small channel is not a breakout signal
+    min_breakout_multiplier_small_channel: 3.0
+    # Stale signal age cutoff (hours)
+    stale_signal_hours: 120
+    # Duplicate source: same channel_id or source_name counts as ONE source
+    deduplicate_by_source_id: true
+
+  # Daily Top 5
+  top5:
+    max_candidates: 5
+    # Only VALIDATED or higher lifecycle can enter Top 5
+    min_lifecycle: VALIDATED
+    # Minimum opportunity score to enter Top 5
+    min_opportunity_score: 0.40
+    # Minimum confidence score to enter Top 5
+    min_confidence_score: 0.30
+    # Must remain HUMAN_APPROVAL = None (pending) until human decides
+    auto_approve: false
+
+  # Reference channel configuration (future use)
+  reference_channels:
+    # Future: list of reference channel IDs for competitor monitoring
+    # Phase 2 does not require populated channels
+    channels: []

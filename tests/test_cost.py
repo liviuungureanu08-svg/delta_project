@@ -1,10 +1,10 @@
 """Tests for CostController and ProductionBudget."""
 
 import pytest
-from kronos.config import reload_all
-from kronos.engine import CostController, RetentionBuilder
-from kronos.models.content_plan import ContentPlan
-from kronos.models.retention import AssetType, RetentionPlan, TimelineSegment
+from delta.config import reload_all
+from delta.engine import CostController, RetentionBuilder
+from delta.models.content_plan import ContentPlan
+from delta.models.retention import AssetType, RetentionPlan, TimelineSegment
 
 
 @pytest.fixture(autouse=True)

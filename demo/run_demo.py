@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kronos Phase 1 — Mock End-to-End Workflow Demo
+Delta Phase 1 — Mock End-to-End Workflow Demo
 
 Demonstrates the complete planning pipeline using mock data only.
 No API keys, no network calls, no paid services required.
@@ -11,12 +11,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Ensure src/ is on the path when run directly
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from kronos.engine import ContentPlanner, CostController, OpportunityEngine, RetentionBuilder
-from kronos.workflow import ApprovalGate, WorkflowState
-from kronos.models.content_plan import ApprovalStatus
+from delta.engine import ContentPlanner, CostController, OpportunityEngine, RetentionBuilder
+from delta.workflow import ApprovalGate, WorkflowState
+from delta.models.content_plan import ApprovalStatus
 
 from mock_data import make_master_research, make_topic_candidate
 
@@ -39,10 +38,9 @@ def demo_approval_gate(subject: str, context: str) -> bool:
 
 
 def main() -> None:
-    print("\nKRONOS AI CONTENT FACTORY — PHASE 1 DEMO")
+    print("\nDELTA AI CONTENT FACTORY — PHASE 1 DEMO")
     print("(offline, mock data, no API keys)")
 
-    # ── Step 1: Topic Candidate ────────────────────────────────────────────────
     separator("STEP 1: Topic Candidate")
     candidate = make_topic_candidate()
     print(f"  Topic   : {candidate.topic}")
@@ -50,7 +48,6 @@ def main() -> None:
     print(f"  Freshness: {candidate.freshness}")
     print(f"  Evidence : {len(candidate.available_evidence)} items")
 
-    # ── Step 2: Opportunity Scoring ────────────────────────────────────────────
     separator("STEP 2: Opportunity Scoring")
     engine = OpportunityEngine()
     engine.score(candidate)
@@ -63,7 +60,6 @@ def main() -> None:
         print("  Score below threshold — stopping.")
         return
 
-    # ── Step 3: Topic Approval Gate ────────────────────────────────────────────
     separator("STEP 3: Topic Approval Gate")
     topic_gate = ApprovalGate(WorkflowState.TOPIC_APPROVAL)
     approved = topic_gate.request_approval(
@@ -77,7 +73,6 @@ def main() -> None:
     candidate.approved = True
     print(f"  Topic approved: {candidate.topic}")
 
-    # ── Step 4: Master Research ────────────────────────────────────────────────
     separator("STEP 4: Master Research (mock)")
     research = make_master_research(candidate.topic)
     print(f"  Topic   : {research.topic}")
@@ -85,7 +80,6 @@ def main() -> None:
     print(f"  Key Facts: {len(research.key_facts)}")
     print(f"  Sources  : {len(research.sources)}")
 
-    # ── Step 5: Content Planning ───────────────────────────────────────────────
     separator("STEP 5: Content Planning")
     planner = ContentPlanner()
 
@@ -99,7 +93,6 @@ def main() -> None:
         print(f"    Duration: {plan.target_duration_seconds}s")
         print(f"    Budget  : {plan.budget_estimate_key}")
 
-    # ── Step 6: Script Approval Gate (for first plan) ─────────────────────────
     separator("STEP 6: Script Approval Gate")
     script_gate = ApprovalGate(WorkflowState.SCRIPT_APPROVAL)
     approved = script_gate.request_approval(
@@ -111,7 +104,6 @@ def main() -> None:
         plans[0].script_approval = ApprovalStatus.APPROVED
         print(f"  Script approved for {plans[0].format}")
 
-    # ── Step 7: Retention Planning ─────────────────────────────────────────────
     separator("STEP 7: Retention Planning")
     builder = RetentionBuilder()
     retention_plans = []
@@ -125,7 +117,6 @@ def main() -> None:
         print(f"    Free seconds   : {rp.free_seconds():.1f}s")
         print(f"    Validation     : {'OK' if not errors else errors}")
 
-    # ── Step 8: Production Budget ──────────────────────────────────────────────
     separator("STEP 8: Production Budget Estimate")
     cost_ctrl = CostController()
     for plan, rp in zip(plans, retention_plans):
@@ -138,7 +129,6 @@ def main() -> None:
         print(f"    Free assets    : {s['free_assets']}")
         print(f"    Paid assets    : {s['paid_assets']}")
 
-    # ── Step 9: Production Approval Gate ──────────────────────────────────────
     separator("STEP 9: Production Approval Gate")
     prod_gate = ApprovalGate(WorkflowState.PRODUCTION_APPROVAL)
     prod_gate.request_approval(
@@ -147,7 +137,6 @@ def main() -> None:
         human_callback=demo_approval_gate,
     )
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     separator("DEMO COMPLETE")
     print("\n  Pipeline completed successfully.")
     print(f"  Topic    : {candidate.topic}")
