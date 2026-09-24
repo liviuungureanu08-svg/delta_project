@@ -53,12 +53,15 @@ class RadarPipeline:
             topic = topic_input["topic"]
             niche = topic_input.get("niche", "ai_tech")
 
-            # Collect evidence from all providers
-            all_evidence: list[Evidence] = []
-            for provider in providers:
-                raw: list[SourceEvidence] = provider.fetch_evidence([topic])
-                for se in raw:
-                    all_evidence.append(evidence_from_source(se))
+            # Reuse evidence already fetched during discovery when available;
+            # otherwise collect fresh evidence from providers.
+            prefetched: list[SourceEvidence] = topic_input.get("discovery_evidence") or []
+            all_evidence: list[Evidence] = [evidence_from_source(se) for se in prefetched]
+            if not all_evidence:
+                for provider in providers:
+                    raw: list[SourceEvidence] = provider.fetch_evidence([topic])
+                    for se in raw:
+                        all_evidence.append(evidence_from_source(se))
 
             candidate = RadarCandidate(
                 topic=topic,

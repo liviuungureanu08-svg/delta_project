@@ -1,11 +1,15 @@
 """Integration tests for the full radar pipeline."""
 
+from datetime import datetime, timezone
+from unittest.mock import patch
+
 import pytest
 
 from delta.config import radar_config, reload_all
 from delta.models.radar import LifecycleState
 from delta.radar import RadarPipeline
 from delta.radar.providers import MockYouTubeProvider, MockTrendsProvider, MockNewsProvider
+from delta.radar.providers.base import SourceEvidence
 
 
 @pytest.fixture(autouse=True)
@@ -98,3 +102,61 @@ def test_pipeline_no_credentials_required():
         assert not p.requires_credentials
         results = p.fetch_evidence(["Claude AI coding agent"])
         assert isinstance(results, list)
+
+
+def test_pipeline_reuses_discovery_evidence_no_extra_fetch():
+    """Discovery evidence in topic_inputs must be reused; providers must not be re-fetched."""
+    discovery_item = SourceEvidence(
+        topic_hint="AI coding agent",
+        source_type="youtube",
+        source_id="yt_disc_001",
+        observed_at=datetime.now(timezone.utc),
+        evidence_type="youtube_video",
+        payload={"view_count": 50000, "channel_baseline_views": 5000},
+        is_independent=True,
+    )
+    topic_inputs = [
+        {
+            "topic": "AI coding agent",
+            "niche": "ai_tech",
+            "discovery_evidence": [discovery_item],
+        }
+    ]
+
+    provider = MockYouTubeProvider()
+    fetch_calls = []
+    original_fetch = provider.fetch_evidence
+
+    def tracking_fetch(topics):
+        fetch_calls.append(topics)
+        return original_fetch(topics)
+
+    provider.fetch_evidence = tracking_fetch
+
+    pipeline = RadarPipeline()
+    pipeline.run(topic_inputs, [provider])
+
+    assert fetch_calls == [], (
+        "fetch_evidence should NOT be called when discovery_evidence is provided; "
+        f"but got {len(fetch_calls)} call(s)"
+    )
+
+
+def test_pipeline_falls_back_to_provider_when_no_discovery_evidence():
+    """When no discovery_evidence key, pipeline must still call providers."""
+    topic_inputs = [{"topic": "AI coding agent", "niche": "ai_tech"}]
+
+    provider = MockYouTubeProvider()
+    fetch_calls = []
+    original_fetch = provider.fetch_evidence
+
+    def tracking_fetch(topics):
+        fetch_calls.append(topics)
+        return original_fetch(topics)
+
+    provider.fetch_evidence = tracking_fetch
+
+    pipeline = RadarPipeline()
+    pipeline.run(topic_inputs, [provider])
+
+    assert len(fetch_calls) >= 1, "fetch_evidence must be called when no discovery_evidence"

@@ -142,7 +142,11 @@ class TopicDiscovery:
         clusters: list[TopicCluster],
         min_evidence: int = 1,
     ) -> list[dict]:
-        """Convert clusters to RadarPipeline topic_inputs format."""
+        """Convert clusters to RadarPipeline topic_inputs format.
+
+        Includes ``discovery_evidence`` so the pipeline can reuse it instead
+        of issuing a second provider fetch for the same topic.
+        """
         inputs = []
         for cluster in clusters:
             if len(cluster.items) < min_evidence:
@@ -152,6 +156,7 @@ class TopicDiscovery:
                 "niche": cluster.niche,
                 "why_now": _build_why_now(cluster),
                 "strongest_evidence_summary": _build_evidence_summary(cluster),
+                "discovery_evidence": list(cluster.items),
             })
         return inputs
 
