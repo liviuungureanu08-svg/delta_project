@@ -124,6 +124,10 @@ class LiveYouTubeProvider(RadarSourceProvider):
             "quota": self._quota.to_dict(),
             "discovery_queries": list(queries),
             "total_discovery_evidence": sum(q["evidence_items"] for q in queries),
+            "configured_query_count": diag.get("configured_query_count"),
+            "effective_query_count": diag.get("effective_query_count"),
+            "discovery_query_limit": diag.get("discovery_query_limit"),
+            "queries_skipped_due_to_limit": diag.get("queries_skipped_due_to_limit", 0),
         }
 
     @property
@@ -171,7 +175,19 @@ class LiveYouTubeProvider(RadarSourceProvider):
 
         Uses quota; prioritizes queries in order given.
         Stops when quota exhausted rather than failing.
+        If config discovery_query_limit is a positive int, only the first N
+        queries run; missing/null runs all.
         """
+        limit = self._config.get("discovery_query_limit")
+        configured_count = len(queries)
+        if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0:
+            queries = queries[:limit]
+        diag = self._diag()
+        diag["configured_query_count"] = configured_count
+        diag["effective_query_count"] = len(queries)
+        diag["discovery_query_limit"] = limit
+        diag["queries_skipped_due_to_limit"] = configured_count - len(queries)
+
         if not self.is_available:
             return []
 

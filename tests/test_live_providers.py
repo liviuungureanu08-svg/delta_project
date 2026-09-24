@@ -208,6 +208,63 @@ def test_live_youtube_discovery_respects_quota(tmp_path):
     assert p._quota.requests_made <= 2
 
 
+def _run_discovery_with_limit(tmp_path, n_queries: int, **cfg):
+    p = _make_youtube_provider(tmp_path, budget=50)
+    p._config = dict(cfg)
+    client = p._client
+    client.search.return_value.list.return_value.execute.return_value = (
+        _mock_search_response(["vid1"])
+    )
+    client.videos.return_value.list.return_value.execute.return_value = (
+        _mock_video_stats_response(["vid1"])
+    )
+    client.channels.return_value.list.return_value.execute.return_value = (
+        _mock_channel_stats_response(["ch_vid1"])
+    )
+    queries = [f"query_{i}" for i in range(n_queries)]
+    p.fetch_discovery_evidence(queries=queries, published_after_hours=48)
+    return p, queries
+
+
+def test_discovery_query_limit_runs_first_n(tmp_path):
+    p, queries = _run_discovery_with_limit(tmp_path, 10, discovery_query_limit=2)
+    assert p._quota.requests_made == 2
+    ran = [q["query"] for q in p.diagnostics()["discovery_queries"]]
+    assert ran == queries[:2]
+
+
+def test_discovery_query_limit_missing_runs_all(tmp_path):
+    p, _ = _run_discovery_with_limit(tmp_path, 10)
+    assert p._quota.requests_made == 10
+
+
+def test_discovery_query_limit_null_runs_all(tmp_path):
+    p, _ = _run_discovery_with_limit(tmp_path, 10, discovery_query_limit=None)
+    assert p._quota.requests_made == 10
+
+
+def test_discovery_query_limit_above_available_runs_all(tmp_path):
+    p, _ = _run_discovery_with_limit(tmp_path, 3, discovery_query_limit=20)
+    assert p._quota.requests_made == 3
+
+
+def test_discovery_query_limit_diagnostics(tmp_path):
+    p, _ = _run_discovery_with_limit(tmp_path, 10, discovery_query_limit=2)
+    d = p.diagnostics()
+    assert d["configured_query_count"] == 10
+    assert d["effective_query_count"] == 2
+    assert d["discovery_query_limit"] == 2
+    assert d["queries_skipped_due_to_limit"] == 8
+    assert len(d["discovery_queries"]) == 2
+
+    p, _ = _run_discovery_with_limit(tmp_path, 10)
+    d = p.diagnostics()
+    assert d["configured_query_count"] == 10
+    assert d["effective_query_count"] == 10
+    assert d["discovery_query_limit"] is None
+    assert d["queries_skipped_due_to_limit"] == 0
+
+
 def test_live_youtube_history_used_for_channel_baselines(tmp_path):
     p = _make_youtube_provider(tmp_path)
     from delta.radar.history import Observation

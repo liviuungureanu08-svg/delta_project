@@ -112,6 +112,9 @@ radar:
       daily_search_budget: 50
       # Hours back to look for newly published videos in discovery
       discovery_published_after_hours: 48
+      # Run only the first N discovery queries (quota saving for dev/testing).
+      # Remove or set to null to run all configured discovery queries.
+      discovery_query_limit: 2
 
     news:
       # max_age_hours: articles older than this are ignored
